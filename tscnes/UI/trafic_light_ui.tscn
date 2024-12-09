@@ -1,0 +1,140 @@
+[gd_scene load_steps=12 format=2]
+
+[ext_resource path="res://sprites/ui/trafic_light_ui.png" type="Texture" id=1]
+[ext_resource path="res://fonts/vcrosdmonorusbyd.ttf" type="DynamicFontData" id=2]
+[ext_resource path="res://sprites/ui/check.png" type="Texture" id=3]
+[ext_resource path="res://scripts/ui/trafic_light_ui.gd" type="Script" id=4]
+
+[sub_resource type="DynamicFont" id=1]
+size = 9
+font_data = ExtResource( 2 )
+
+[sub_resource type="StreamTexture" id=2]
+load_path = "res://.import/check.png-c77f5f1d8b6c554ee64da8efddb51998.stex"
+
+[sub_resource type="StreamTexture" id=3]
+load_path = "res://.import/check.png-c77f5f1d8b6c554ee64da8efddb51998.stex"
+
+[sub_resource type="RectangleShape2D" id=4]
+extents = Vector2( 70, 10 )
+
+[sub_resource type="RectangleShape2D" id=5]
+extents = Vector2( 70, 10 )
+
+[sub_resource type="RectangleShape2D" id=6]
+extents = Vector2( 70, 10 )
+
+[sub_resource type="RectangleShape2D" id=7]
+extents = Vector2( 120, 10 )
+
+[node name="trafic_light_ui" type="Sprite"]
+texture = ExtResource( 1 )
+centered = false
+script = ExtResource( 4 )
+
+[node name="labels" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="time_left" type="Label" parent="labels"]
+margin_left = 157.0
+margin_top = 33.0
+margin_right = 181.0
+margin_bottom = 56.0
+custom_fonts/font = SubResource( 1 )
+text = "120"
+align = 1
+valign = 1
+
+[node name="state" type="Label" parent="labels"]
+modulate = Color( 0, 1, 0.156863, 1 )
+margin_left = 157.0
+margin_top = 75.0
+margin_right = 235.0
+margin_bottom = 123.0
+custom_fonts/font = SubResource( 1 )
+text = "Работает"
+align = 1
+valign = 1
+autowrap = true
+
+[node name="name" type="Label" parent="labels"]
+margin_left = 15.0
+margin_top = 5.0
+margin_right = 235.0
+margin_bottom = 32.0
+custom_fonts/font = SubResource( 1 )
+text = "Не выбран"
+align = 1
+valign = 1
+
+[node name="count_overall" type="Label" parent="labels"]
+margin_left = 120.0
+margin_top = 137.0
+margin_right = 250.0
+margin_bottom = 154.0
+custom_fonts/font = SubResource( 1 )
+text = "100"
+align = 1
+valign = 1
+
+[node name="count_horiz" type="Label" parent="labels"]
+margin_left = 164.0
+margin_top = 161.0
+margin_right = 250.0
+margin_bottom = 178.0
+custom_fonts/font = SubResource( 1 )
+text = "100"
+align = 1
+valign = 1
+
+[node name="count_vert" type="Label" parent="labels"]
+margin_left = 147.0
+margin_top = 184.0
+margin_right = 250.0
+margin_bottom = 201.0
+custom_fonts/font = SubResource( 1 )
+text = "100"
+align = 1
+valign = 1
+
+[node name="checks" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="cross" type="Sprite" parent="checks"]
+position = Vector2( 142, 65 )
+texture = ExtResource( 3 )
+
+[node name="horiz" type="Sprite" parent="checks"]
+position = Vector2( 142, 95 )
+texture = SubResource( 2 )
+
+[node name="vert" type="Sprite" parent="checks"]
+position = Vector2( 142, 124 )
+texture = SubResource( 3 )
+
+[node name="buttons" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="cross" type="TouchScreenButton" parent="buttons"]
+position = Vector2( 5, 54 )
+shape = SubResource( 4 )
+
+[node name="horiz" type="TouchScreenButton" parent="buttons"]
+position = Vector2( 5, 84 )
+shape = SubResource( 5 )
+
+[node name="vert" type="TouchScreenButton" parent="buttons"]
+position = Vector2( 5, 114 )
+shape = SubResource( 6 )
+
+[node name="reconnect" type="TouchScreenButton" parent="buttons"]
+position = Vector2( 5, 226 )
+shape = SubResource( 7 )
+
+[connection signal="pressed" from="buttons/cross" to="." method="_on_cross_pressed"]
+[connection signal="pressed" from="buttons/horiz" to="." method="_on_horiz_pressed"]
+[connection signal="pressed" from="buttons/vert" to="." method="_on_vert_pressed"]
+[connection signal="pressed" from="buttons/reconnect" to="." method="_on_reconnect_pressed"]

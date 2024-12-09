@@ -1,0 +1,3283 @@
+[gd_scene load_steps=46 format=2]
+
+[ext_resource path="res://scripts/locations/main.gd" type="Script" id=1]
+[ext_resource path="res://tscnes/speed_limits/speed_camera.tscn" type="PackedScene" id=2]
+[ext_resource path="res://tscnes/zones/prioritize_change.tscn" type="PackedScene" id=3]
+[ext_resource path="res://tscnes/evac/evac_place.tscn" type="PackedScene" id=4]
+[ext_resource path="res://tscnes/trafic_lights/trafic_lights.tscn" type="PackedScene" id=5]
+[ext_resource path="res://tscnes/zones/turning_zone.tscn" type="PackedScene" id=6]
+[ext_resource path="res://tscnes/zones/show_zone.tscn" type="PackedScene" id=7]
+[ext_resource path="res://tscnes/UI/ui.tscn" type="PackedScene" id=8]
+[ext_resource path="res://tscnes/roads/road_switch.tscn" type="PackedScene" id=9]
+[ext_resource path="res://tscnes/parking/parking_lot.tscn" type="PackedScene" id=10]
+[ext_resource path="res://tscnes/repair/repair_place.tscn" type="PackedScene" id=11]
+[ext_resource path="res://tscnes/zones/car_checkin_zone.tscn" type="PackedScene" id=12]
+[ext_resource path="res://tscnes/speed_limits/speed_limit_zone.tscn" type="PackedScene" id=13]
+[ext_resource path="res://tscnes/zones/car_spawn_check_zone.tscn" type="PackedScene" id=14]
+
+[sub_resource type="RectangleShape2D" id=2]
+
+[sub_resource type="RectangleShape2D" id=3]
+
+[sub_resource type="RectangleShape2D" id=4]
+
+[sub_resource type="RectangleShape2D" id=5]
+
+[sub_resource type="RectangleShape2D" id=18]
+
+[sub_resource type="GDScript" id=19]
+script/source = "extends Area2D
+
+
+func get_class():
+	return \"trafic_lights\"
+
+export var is_main = true
+export var need_deviation = false
+export var deviation = 1.0
+export(String, \"both\",\"main\",\"slave\") var type_way
+export(NodePath) var main_zone_car_count
+export(NodePath) var slave_zone_car_count
+export(NodePath) var trafic_master_node
+export(NodePath) var left_zone
+export(NodePath) var right_zone
+export(int, 7, 120) var duration
+export(String, \"working\", \"no_connection\", \"fail\") var state = \"working\"
+export(String, \"go\", \"wait\", \"stop\", \"ready\") var work_state = \"go\"
+var green_light = false
+var yellow_light = false
+var red_light = false
+
+var hor_count = 0
+var vert_count = 0
+var all_count = 0
+var avg_speed = 0.0
+var consumption = 0.005
+
+var time_left_leg = 7
+var reconect_time_left = 0
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+func reset_lights():
+	if is_main:
+		state = \"working\"
+		work_state = \"go\"
+		$timers/real_timer.start(duration)
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	if is_main:
+		$timers/real_timer.start(duration)
+	if left_zone:
+		var l_zone = get_node(left_zone)
+		$base_left.global_position = l_zone.global_position
+		$base_left.global_rotation = l_zone.global_rotation
+	else:
+		$base_left.hide()
+	if right_zone:
+		var r_zone = get_node(right_zone)
+		$base_right.global_position = r_zone.global_position
+		$base_right.global_rotation = r_zone.global_rotation
+	else:
+		$base_right.hide()
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(_delta):
+	if is_main:
+		reconect_time_left = $timers/reconnect_timer.time_left
+		if state == \"working\":
+			var master_cars = get_node_or_null(main_zone_car_count)
+			var slave_cars = get_node_or_null(slave_zone_car_count)
+			if master_cars:
+				master_cars.show()
+			if slave_cars:
+				slave_cars.show()
+			consumption = rand_range(0.04, 0.06)
+			time_left_leg = $timers/real_timer.time_left
+			if need_deviation:
+				car_count_decision()
+			if type_way == \"main\":
+				work_state = \"go\"
+			if type_way == \"slave\":
+				work_state = \"stop\"
+			set_lights(work_state)
+			if work_state == \"go\":
+				set_zones(false)
+			else: 
+				set_zones(true)
+		else:
+			var master_cars = get_node_or_null(main_zone_car_count)
+			var slave_cars = get_node_or_null(slave_zone_car_count)
+			if master_cars:
+				master_cars.hide()
+			if slave_cars:
+				slave_cars.hide()
+			consumption = rand_range(0.1, 0.2)
+			time_left_leg = -1
+			hor_count = -1
+			all_count = -1
+			vert_count = -1
+			set_zones(true)
+	else:
+		if trafic_master_node:
+			var trafic_master = get_node(trafic_master_node)
+			state = trafic_master.state
+			if trafic_master.state == \"working\":
+				set_lights_opposing(trafic_master.work_state)
+				if trafic_master.work_state == \"stop\":
+					set_zones(false)
+				else:
+					set_zones(true)
+			else:
+				set_zones(true)
+	pass
+
+
+func calculate_avg_speed():
+	if main_zone_car_count and slave_zone_car_count:
+		var master_cars = get_node_or_null(main_zone_car_count)
+		var slave_cars = get_node_or_null(slave_zone_car_count)
+		if slave_cars.cars_array.size() == 0:
+			avg_speed = master_cars.avg_speed
+		elif master_cars.cars_array.size() == 0:
+			avg_speed = slave_cars.avg_speed
+		else:
+			avg_speed = (master_cars.avg_speed + slave_cars.avg_speed)/2
+	pass
+
+func car_count_decision():
+	if main_zone_car_count and slave_zone_car_count:
+		var master_cars = get_node_or_null(main_zone_car_count).cars_array.size()
+		hor_count = master_cars
+		var slave_cars = get_node_or_null(slave_zone_car_count).cars_array.size()
+		vert_count = slave_cars
+		all_count = hor_count + vert_count
+		calculate_avg_speed()
+		if master_cars != 0 and slave_cars !=0:
+			deviation = float(master_cars)/float(slave_cars)
+		else:
+			deviation = 1.0
+	else:
+		print(name+\" NOT SET\")
+	if main_zone_car_count and not slave_zone_car_count:
+		var master_cars = get_node_or_null(main_zone_car_count).cars_array.size()
+		avg_speed = get_node_or_null(main_zone_car_count).avg_speed
+		hor_count = master_cars
+		all_count = hor_count
+
+func set_zones(zone_state):
+	if left_zone:
+		get_node(left_zone).set_deferred(\"disabled\", not zone_state)
+	if right_zone:
+		get_node(right_zone).set_deferred(\"disabled\", not zone_state)
+
+
+func set_lights(act_state):
+	match act_state:
+		\"go\":
+			green_light = true
+			yellow_light = false
+			red_light = false
+		\"wait\":
+			green_light = false
+			yellow_light = true
+			red_light = false
+		\"stop\":
+			green_light = false
+			yellow_light = false
+			red_light = true
+		\"ready\":
+			green_light = false
+			yellow_light = true
+			red_light = true
+	recolor(red_light, yellow_light, green_light)
+
+func set_lights_opposing(act_state):
+	match act_state:
+		\"go\":
+			green_light = false
+			yellow_light = false
+			red_light = true
+		\"wait\":
+			green_light = false
+			yellow_light = true
+			red_light = true
+		\"stop\":
+			green_light = true
+			yellow_light = false
+			red_light = false
+		\"ready\":
+			green_light = false
+			yellow_light = true
+			red_light = false
+	recolor(red_light, yellow_light, green_light)
+
+
+func rand_lights():
+	green_light = bool(int(rand_range(0,2)))
+	yellow_light = bool(int(rand_range(0,2)))
+	red_light = bool(int(rand_range(0,2)))
+	recolor(red_light, yellow_light, green_light)
+
+func no_connection_lights():
+	green_light = false
+	yellow_light = not yellow_light
+	red_light = false
+	recolor(red_light,yellow_light,green_light)
+
+
+func recolor(red, yellow, green):
+	$base_left/green.visible = green
+	$base_right/green.visible = green
+	$base_left/red.visible = red
+	$base_right/red.visible = red
+	$base_left/yellow.visible = yellow
+	$base_right/yellow.visible = yellow
+
+func _on_switch_timer_timeout():
+	if is_main:
+		if state == \"working\":
+			if work_state == \"wait\":
+				work_state = \"stop\"
+				$timers/real_timer.start(clamp(duration*(1/deviation),7,120))
+				Global.log_stuff(0,\"Переключение светофора \"+name+\". Длительность: \"+str(clamp(duration*deviation,7,120)))
+			if work_state == \"ready\":
+				work_state = \"go\"
+				$timers/real_timer.start(clamp(duration*deviation,7,120))
+				Global.log_stuff(0,\"Переключение светофора \"+name+\". Длительность: \"+str(clamp(duration*deviation,7,120)))
+	pass # Replace with function body.
+
+
+func _on_real_timer_timeout():
+	if is_main:
+		if state == \"working\":
+			if work_state == \"go\":
+				work_state = \"wait\"
+				$timers/switch_timer.start()
+			elif work_state == \"stop\":
+				work_state = \"ready\"
+				$timers/switch_timer.start()
+	pass # Replace with function body.
+
+
+func _on_fail_timer_timeout():
+	if state == \"fail\":
+		rand_lights()
+	pass # Replace with function body.
+
+
+
+func _on_no_connection_timeout():
+	if state == \"no_connection\":
+		no_connection_lights()
+	pass # Replace with function body.
+
+
+func _on_trafic_lights_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.trafic_lights_stop()
+	pass # Replace with function body.
+
+
+func _on_trafic_lights_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.trafic_lights_go()
+	pass # Replace with function body.
+
+
+func _on_button_pressed():
+	if is_main:
+		Global.current_trafic_light = self
+	else:
+		Global.current_trafic_light = get_node(trafic_master_node)
+	pass # Replace with function body.
+
+
+func _on_cost_timer_timeout():
+	Global.energy_cost += consumption*10
+	pass # Replace with function body.
+
+
+func lost_connection():
+	if is_main:
+		state = \"no_connection\"
+		Global.log_stuff(2, name+\": потерян сигнал, срочно переподключите этот светофор\")
+		Global.create_notification(2, name+\": потерян сигнал, срочно переподключите этот светофор\", global_position)
+
+func broken():
+	if is_main:
+		state = \"fail\"
+		Global.log_stuff(2, name+\": критическая ошибка в работе светофора, срочно отправьте службу по ремонту\")
+		Global.create_notification(2, name+\": критическая ошибка в работе светофора, срочно отправьте службу по ремонту\", global_position)
+
+
+func start_reconnect():
+	$timers/reconnect_timer.start(rand_range(5, 10))
+	pass
+
+func reconnect():
+	if state == \"no_connection\":
+		var broke_chance=rand_range(0,1)
+		if broke_chance >0.9:
+			broken()
+		else:
+			state = \"working\"
+			reset_lights()
+	pass
+
+
+func _on_reconnect_timer_timeout():
+	reconnect()
+	pass # Replace with function body.
+
+func repair():
+	if state != \"working\":
+		state = \"working\"
+		reset_lights()
+		Global.repair_cost += int(rand_range(5000, 15000))
+
+func start_repair():
+	if $timers/repair_timer.time_left == 0:
+		$timers/repair_timer.start(rand_range(10, 30))
+	pass
+
+
+func _on_repair_timer_timeout():
+	repair()
+	pass # Replace with function body.
+"
+
+[sub_resource type="RectangleShape2D" id=20]
+
+[sub_resource type="RectangleShape2D" id=9]
+extents = Vector2( 46, 10 )
+
+[sub_resource type="GDScript" id=23]
+script/source = "extends Area2D
+
+export var acceptable_speed = 60
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(delta):
+	$start/lbl.text = str(acceptable_speed)
+	$end/lbl.text = str(acceptable_speed)
+	if get_child_count() == 3:
+		if get_child(2).get_child_count() >= 2:
+			$start.global_position = get_child(2).get_child(0).global_position
+			$end.global_position = get_child(2).get_child(1).global_position
+	pass
+
+
+func _on_speed_limit_zone_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.set_new_speed(acceptable_speed)
+	pass # Replace with function body.
+
+
+func _on_speed_limit_zone_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.reset_speed()
+	pass # Replace with function body.
+"
+
+[sub_resource type="GDScript" id=24]
+script/source = "extends Area2D
+
+export var acceptable_speed = 60
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(delta):
+	$start/lbl.text = str(acceptable_speed)
+	$end/lbl.text = str(acceptable_speed)
+	if get_child_count() == 3:
+		if get_child(2).get_child_count() >= 2:
+			$start.global_position = get_child(2).get_child(0).global_position
+			$end.global_position = get_child(2).get_child(1).global_position
+	pass
+
+
+func _on_speed_limit_zone_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.set_new_speed(acceptable_speed)
+	pass # Replace with function body.
+
+
+func _on_speed_limit_zone_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.reset_speed()
+	pass # Replace with function body.
+"
+
+[sub_resource type="GDScript" id=25]
+script/source = "extends Area2D
+
+export var acceptable_speed = 60
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(delta):
+	$start/lbl.text = str(acceptable_speed)
+	$end/lbl.text = str(acceptable_speed)
+	if get_child_count() == 3:
+		if get_child(2).get_child_count() >= 2:
+			$start.global_position = get_child(2).get_child(0).global_position
+			$end.global_position = get_child(2).get_child(1).global_position
+	pass
+
+
+func _on_speed_limit_zone_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.set_new_speed(acceptable_speed)
+	pass # Replace with function body.
+
+
+func _on_speed_limit_zone_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.reset_speed()
+	pass # Replace with function body.
+"
+
+[sub_resource type="GDScript" id=26]
+script/source = "extends Area2D
+
+export var acceptable_speed = 60
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(delta):
+	$start/lbl.text = str(acceptable_speed)
+	$end/lbl.text = str(acceptable_speed)
+	if get_child_count() == 3:
+		if get_child(2).get_child_count() >= 2:
+			$start.global_position = get_child(2).get_child(0).global_position
+			$end.global_position = get_child(2).get_child(1).global_position
+	pass
+
+
+func _on_speed_limit_zone_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.set_new_speed(acceptable_speed)
+	pass # Replace with function body.
+
+
+func _on_speed_limit_zone_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			body.reset_speed()
+	pass # Replace with function body.
+"
+
+[sub_resource type="RectangleShape2D" id=10]
+extents = Vector2( 33, 10 )
+
+[sub_resource type="RectangleShape2D" id=13]
+extents = Vector2( 69.5, 10 )
+
+[sub_resource type="RectangleShape2D" id=14]
+extents = Vector2( 10, 66 )
+
+[sub_resource type="GDScript" id=21]
+script/source = "extends Area2D
+
+export(PackedScene) var detect_point_scene
+var cars_array = []
+var avg_speed = 0.0
+var detect_point
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	detect_point = detect_point_scene
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(_delta):
+	avg_speed = get_avg(cars_array)
+	pass
+
+
+func get_avg(array:Array):
+	var avg = 0.0
+	if array.size() != 0:
+		for i in range(0, array.size()):
+			avg += sign(array[i].act_speed)*array[i].speed
+		avg = avg/array.size()
+	return avg
+
+
+func _on_car_checkin_zone_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			var n_point = detect_point.instance()
+			n_point.target = body
+			$points.add_child(n_point)
+			cars_array.append(body)
+	pass # Replace with function body.
+
+
+func _on_car_checkin_zone_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			cars_array.erase(body)
+			for i in range(0, $points.get_child_count()):
+				if $points.get_child(i).target == body:
+					$points.get_child(i).queue_free()
+					break
+	pass # Replace with function body.
+"
+
+[sub_resource type="GDScript" id=22]
+script/source = "extends Area2D
+
+export(PackedScene) var detect_point_scene
+var cars_array = []
+var avg_speed = 0.0
+var detect_point
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	detect_point = detect_point_scene
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(_delta):
+	avg_speed = get_avg(cars_array)
+	pass
+
+
+func get_avg(array:Array):
+	var avg = 0.0
+	if array.size() != 0:
+		for i in range(0, array.size()):
+			avg += sign(array[i].act_speed)*array[i].speed
+		avg = avg/array.size()
+	return avg
+
+
+func _on_car_checkin_zone_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			var n_point = detect_point.instance()
+			n_point.target = body
+			$points.add_child(n_point)
+			cars_array.append(body)
+	pass # Replace with function body.
+
+
+func _on_car_checkin_zone_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			cars_array.erase(body)
+			for i in range(0, $points.get_child_count()):
+				if $points.get_child(i).target == body:
+					$points.get_child(i).queue_free()
+					break
+	pass # Replace with function body.
+"
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 25, 26 )
+
+[sub_resource type="RectangleShape2D" id=11]
+extents = Vector2( 16.25, 10 )
+
+[sub_resource type="RectangleShape2D" id=12]
+extents = Vector2( 16.25, 10 )
+
+[sub_resource type="RectangleShape2D" id=27]
+
+[sub_resource type="RectangleShape2D" id=28]
+
+[sub_resource type="GDScript" id=29]
+script/source = "extends Area2D
+
+export(PackedScene) var detect_point_scene
+export(PackedScene) var zone_scene
+var detect_point
+var cars_array = []
+var all_count = 0
+var avg_speed = 0.0
+export var limit_speed = 120.0
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	if zone_scene:
+		var zone = zone_scene.instance()
+		for i in range(0, get_child_count()):
+			if get_child(i) is CollisionShape2D:
+				zone.color = Color(1,1,1,0.25)
+				get_child(i).add_child(zone)
+	detect_point = detect_point_scene
+	pass # Replace with function body.
+
+func get_avg(array:Array):
+	var avg = 0.0
+	if array.size() != 0:
+		for i in range(0, array.size()):
+			avg += sign(array[i].act_speed)*array[i].speed
+		avg = avg/array.size()
+	return avg
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(_delta):
+	avg_speed = get_avg(cars_array)
+	pass
+
+
+
+func _on_speed_camera_body_entered(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			var n_point = detect_point.instance()
+			n_point.target = body
+			if body.speed > limit_speed + 20:
+				n_point.self_modulate = Color.red
+				var fine_ammount = 0
+				if body.speed - limit_speed > 20:
+					fine_ammount = 500
+				if body.speed - limit_speed > 40:
+					fine_ammount = int(rand_range(1000,1500))
+				if body.speed - limit_speed > 60:
+					fine_ammount = int(rand_range(2000,2500))
+				if body.speed - limit_speed > 80:
+					fine_ammount = int(5000)
+				Global.fine += fine_ammount
+				Global.log_stuff(1, \"Нарушение скоростного режима: Автомобиль с номером \"+str(body.id_number)
+				+ \" превысил скорость на \"+str(body.speed-limit_speed)+\". Объем штрафа: \"+str(fine_ammount))
+				print(\"UNLAW: \"+str(body.id_number))
+			$points.add_child(n_point)
+			cars_array.append(body)
+	pass # Replace with function body.
+
+
+func _on_speed_camera_body_exited(body):
+	if body.has_method(\"get_class\"):
+		if body.get_class() == \"car\":
+			cars_array.erase(body)
+			for i in range(0, $points.get_child_count()):
+				if $points.get_child(i).target == body:
+					$points.get_child(i).queue_free()
+					break
+	pass # Replace with function body.
+"
+
+[sub_resource type="RectangleShape2D" id=6]
+extents = Vector2( 17, 10 )
+
+[sub_resource type="RectangleShape2D" id=7]
+extents = Vector2( 7.5, 21 )
+
+[sub_resource type="RectangleShape2D" id=8]
+
+[sub_resource type="RectangleShape2D" id=30]
+extents = Vector2( 17, 17 )
+
+[sub_resource type="GDScript" id=31]
+script/source = "extends TouchScreenButton
+
+export var speed = 30.0
+export var target_pos = Vector2.ZERO
+export var is_active = false
+export(String, \"start\",\"checking\",\"home\") var mission_state
+export(NodePath) var starting_road_switch
+var start_road_switch_node
+onready var evac_car = $evac_moving
+onready var line_to_pointer = $line_to_pointer
+# Declare member variables here. Examples:
+# var a = 2
+# var b = \"text\"
+var act_speed = 0
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	start_road_switch_node = get_node_or_null(starting_road_switch)
+	$line_to_road_switch.global_position = Vector2.ZERO
+	$line_to_pointer.global_position = Vector2.ZERO
+	$line_to_pointer.set_point_position(0,global_position)
+	$line_to_road_switch.set_point_position(0, global_position)
+	if start_road_switch_node:
+		$line_to_road_switch.set_point_position(1,start_road_switch_node.global_position)
+		$line_to_road_switch.show()
+	pass # Replace with function body.
+
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+func _process(delta):
+	evac_car.visible = is_active
+	evac_car.monitoring = is_active
+	line_to_pointer.visible = Global.current_repair_evac == self
+	line_to_pointer.set_point_position(1, Global.camera_node.global_position)
+	if is_active:
+		act_speed = speed*1000/60/60*delta
+		var direction = Vector2.ZERO
+		if mission_state == \"start\":
+			
+			if evac_car.global_position.distance_to(target_pos)>10:
+				direction = evac_car.global_position.direction_to(target_pos)
+			elif $wait_timer.time_left == 0:
+				$wait_timer.start()
+		elif mission_state == \"home\":
+			direction = evac_car.global_position.direction_to(global_position)
+			if evac_car.global_position.distance_to(global_position) < 10:
+				is_active = false
+				mission_state = \"start\"
+		evac_car.global_position += direction*act_speed
+		evac_car.get_node(\"spr\").flip_h = sign(direction.x) == -1
+	pass
+
+
+
+func _on_evac_place_pressed():
+	Global.current_repair_evac = self
+	pass # Replace with function body.
+
+
+func call_service(in_pos):
+	if not is_active:
+		is_active = true
+		target_pos = in_pos
+		mission_state = \"start\"
+	pass
+
+
+func _on_wait_timer_timeout():
+	mission_state = \"home\"
+	pass # Replace with function body.
+
+
+func _on_evac_moving_body_entered(body):
+	if is_active:
+		if body.get_parent().has_method(\"get_class\"):
+			if body.get_parent().get_class() == \"car\":
+				if body.get_parent().state_of_driving == \"accident\":
+					Global.fine += int(rand_range(1500, 5000)*global_position.distance_to(body.get_parent().global_position)/1000)
+					body.get_parent().start_repair()
+					body.get_parent().global_position = global_position
+					body.get_parent().position_to_go = start_road_switch_node.global_position
+	pass # Replace with function body.
+"
+
+[sub_resource type="RectangleShape2D" id=15]
+
+[sub_resource type="RectangleShape2D" id=17]
+
+[sub_resource type="RectangleShape2D" id=16]
+
+[node name="main" type="Node2D"]
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_horizontal_guides_": [ -11.0, -45.0, -416.0, 372.0, 409.0, -453.0 ],
+"_edit_vertical_guides_": [ -404.0, 506.0, -5.0, -32.0, 535.0, -431.0 ]
+}
+
+[node name="roads" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="center" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, -11 )
+next_road_swithces = [ NodePath("../bottom"), NodePath("../center_r"), NodePath("../center_top_r") ]
+prioritized_road_swithces = [ NodePath("../bottom") ]
+
+[node name="center_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, -11 )
+next_road_swithces = [ NodePath("../right"), NodePath("../center_top"), NodePath("../center_top_r") ]
+prioritized_road_swithces = [ NodePath("../right") ]
+
+[node name="bottom" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, 372 )
+next_road_swithces = [ NodePath("../corner_bottom"), NodePath("../center_bottom_bottom_l"), NodePath("../center_bottom_bottom_r") ]
+prioritized_road_swithces = [ NodePath("../corner_bottom") ]
+
+[node name="bottom_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, 372 )
+next_road_swithces = [ NodePath("../center_r"), NodePath("../bottom"), NodePath("../center_bottom_bottom_l") ]
+prioritized_road_swithces = [ NodePath("../center_r") ]
+
+[node name="center_top" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, -45 )
+next_road_swithces = [ NodePath("../left_top"), NodePath("../center_r"), NodePath("../center") ]
+prioritized_road_swithces = [ NodePath("../left_top") ]
+
+[node name="center_top_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, -45 )
+next_road_swithces = [ NodePath("../top_r"), NodePath("../center_top"), NodePath("../center") ]
+prioritized_road_swithces = [ NodePath("../top_r") ]
+
+[node name="right" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, -11 )
+next_road_swithces = [ NodePath("../corner_bottom_r"), NodePath("../right_side_center_up"), NodePath("../right_side_center_down") ]
+prioritized_road_swithces = [ NodePath("../corner_bottom_r") ]
+
+[node name="right_top" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, -45 )
+next_road_swithces = [ NodePath("../center_top_r"), NodePath("../right"), NodePath("../right_side_center_down") ]
+prioritized_road_swithces = [ NodePath("../center_top_r") ]
+
+[node name="corner_bottom_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, 372 )
+next_road_swithces = [ NodePath("../bottom_r"), NodePath("../bottom_right_r"), NodePath("../bottom_right_l") ]
+prioritized_road_swithces = [ NodePath("../bottom_r") ]
+
+[node name="corner_bottom" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, 372 )
+next_road_swithces = [ NodePath("../left"), NodePath("../left_bottom_bottom"), NodePath("../left_bottom_top") ]
+prioritized_road_swithces = [ NodePath("../left") ]
+
+[node name="left" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, -11 )
+next_road_swithces = [ NodePath("../center"), NodePath("../center_left_top_l"), NodePath("../left_top") ]
+prioritized_road_swithces = [ NodePath("../center") ]
+
+[node name="left_top" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, -45 )
+next_road_swithces = [ NodePath("../corner_top"), NodePath("../center_left_top_l"), NodePath("../center_left_bottom_l") ]
+prioritized_road_swithces = [ NodePath("../corner_top") ]
+
+[node name="corner_top" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, -416 )
+next_road_swithces = [ NodePath("../top") ]
+
+[node name="top" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, -416 )
+next_road_swithces = [ NodePath("../center_top"), NodePath("../top_center_r"), NodePath("../top_r") ]
+prioritized_road_swithces = [ NodePath("../center_top") ]
+
+[node name="top_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, -416 )
+next_road_swithces = [ NodePath("../corner_top_r"), NodePath("../top_center_l"), NodePath("../top_center_r") ]
+prioritized_road_swithces = [ NodePath("../corner_top_r") ]
+
+[node name="corner_top_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, -416 )
+next_road_swithces = [ NodePath("../right_top"), NodePath("../right_side_top_right"), NodePath("../top_right_r") ]
+prioritized_road_swithces = [ NodePath("../right_top") ]
+
+[node name="right_side_center_up" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, -45 )
+next_road_swithces = [ NodePath("../right_side_top_right"), NodePath("../right_top"), NodePath("../right") ]
+prioritized_road_swithces = [ NodePath("../right_side_top_right") ]
+
+[node name="right_side_center_down" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, -11 )
+next_road_swithces = [ NodePath("../right_side_center_up"), NodePath("../right_top"), NodePath("../right_side_exit") ]
+prioritized_road_swithces = [ NodePath("../right_side_exit") ]
+
+[node name="right_side_top_right" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, -416 )
+next_road_swithces = [ NodePath("../top_right_exit"), NodePath("../top_right_l"), NodePath("../top_right_r") ]
+prioritized_road_swithces = [ NodePath("../top_right_exit") ]
+
+[node name="right_side_bottom_right" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, 372 )
+next_road_swithces = [ NodePath("../right_side_center_down"), NodePath("../corner_bottom_r"), NodePath("../bottom_right_l") ]
+prioritized_road_swithces = [ NodePath("../right_side_center_down") ]
+
+[node name="right_side_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 1250, -11 )
+next_road_swithces = [ NodePath("../right_side_entry") ]
+
+[node name="right_side_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 1250, -45 )
+next_road_swithces = [ NodePath("../right_side_center_up") ]
+
+[node name="bottom_right_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, 409 )
+next_road_swithces = [ NodePath("../bottom_right_exit2"), NodePath("../right_side_bottom_right"), NodePath("../bottom_right_r") ]
+prioritized_road_swithces = [ NodePath("../bottom_right_exit2") ]
+
+[node name="bottom_right_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, 409 )
+next_road_swithces = [ NodePath("../corner_bottom_r"), NodePath("../right_side_bottom_right"), NodePath("../bottom_right_exit") ]
+prioritized_road_swithces = [ NodePath("../bottom_right_exit") ]
+
+[node name="bottom_right_exit2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, 867 )
+next_road_swithces = [ NodePath("../bottom_right_entry2") ]
+
+[node name="bottom_right_entry2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, 867 )
+next_road_swithces = [ NodePath("../bottom_right_r") ]
+
+[node name="bottom_right_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 1278, 408 )
+next_road_swithces = [ NodePath("../bottom_right_entry") ]
+
+[node name="bottom_right_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 1278, 372 )
+next_road_swithces = [ NodePath("../right_side_bottom_right") ]
+
+[node name="top_right_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, -453 )
+next_road_swithces = [ NodePath("../top_center_r"), NodePath("../right_side_top_right"), NodePath("../corner_top_r") ]
+prioritized_road_swithces = [ NodePath("../top_center_r") ]
+
+[node name="top_right_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, -453 )
+next_road_swithces = [ NodePath("../top_right_exit2"), NodePath("../corner_top_r"), NodePath("../top_right_l") ]
+prioritized_road_swithces = [ NodePath("../top_right_exit2") ]
+
+[node name="top_right_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 1190, -416 )
+next_road_swithces = [ NodePath("../top_right_entry") ]
+
+[node name="top_right_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 1190, -453 )
+next_road_swithces = [ NodePath("../top_right_r") ]
+
+[node name="top_right_entry2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 506, -934 )
+next_road_swithces = [ NodePath("../top_right_l") ]
+
+[node name="top_right_exit2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( 535, -934 )
+next_road_swithces = [ NodePath("../top_right_entry2") ]
+
+[node name="top_center_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, -453 )
+next_road_swithces = [ NodePath("../top_center_exit"), NodePath("../top_center_l"), NodePath("../top") ]
+prioritized_road_swithces = [ NodePath("../top_center_exit") ]
+
+[node name="top_center_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, -453 )
+next_road_swithces = [ NodePath("../top_left_r"), NodePath("../top"), NodePath("../top_r") ]
+prioritized_road_swithces = [ NodePath("../top_left_r") ]
+
+[node name="top_left_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, -453 )
+next_road_swithces = [ NodePath("../corner_top_exit"), NodePath("../top_left_l"), NodePath("../corner_top_l") ]
+prioritized_road_swithces = [ NodePath("../corner_top_exit") ]
+
+[node name="top_left_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, -453 )
+next_road_swithces = [ NodePath("../corner_top_exit2"), NodePath("../corner_top_l"), NodePath("../corner_top") ]
+prioritized_road_swithces = [ NodePath("../corner_top_exit2") ]
+
+[node name="corner_top_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, -416 )
+next_road_swithces = [ NodePath("../center_left_top_l"), NodePath("../top_left_r"), NodePath("../corner_top") ]
+prioritized_road_swithces = [ NodePath("../center_left_top_l") ]
+
+[node name="top_center_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, -1117 )
+next_road_swithces = [ NodePath("../top_center_l") ]
+
+[node name="top_center_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, -1117 )
+next_road_swithces = [ NodePath("../top_center_entry") ]
+
+[node name="corner_top_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, -1141 )
+next_road_swithces = [ NodePath("../top_left_l") ]
+
+[node name="corner_top_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, -1141 )
+next_road_swithces = [ NodePath("../corner_top_entry") ]
+
+[node name="corner_top_exit2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -1345, -453 )
+next_road_swithces = [ NodePath("../corner_top_entry2") ]
+
+[node name="corner_top_entry2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -1345, -416 )
+next_road_swithces = [ NodePath("../corner_top_l") ]
+
+[node name="center_left_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -1563, -45 )
+next_road_swithces = [ NodePath("../center_left_entry") ]
+
+[node name="center_left_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -1563, -11 )
+next_road_swithces = [ NodePath("../center_left_bottom_l") ]
+
+[node name="bottom_left_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -1284, 370 )
+next_road_swithces = [ NodePath("../bottom_left_entry") ]
+
+[node name="bottom_left_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -1284, 409 )
+next_road_swithces = [ NodePath("../left_bottom_bottom") ]
+
+[node name="bottom_left_entry2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, 1114 )
+next_road_swithces = [ NodePath("../left_bottom_bottom_r") ]
+
+[node name="bottom_left_exit2" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, 1114 )
+next_road_swithces = [ NodePath("../bottom_left_entry2") ]
+
+[node name="botttom_center_exit" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -34, 1316 )
+next_road_swithces = [ NodePath("../bottom_center_entry") ]
+
+[node name="bottom_center_entry" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, 1316 )
+next_road_swithces = [ NodePath("../center_bottom_bottom_r") ]
+
+[node name="center_left_top_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, -45 )
+next_road_swithces = [ NodePath("../center_left_exit"), NodePath("../left"), NodePath("../center_left_bottom_l") ]
+prioritized_road_swithces = [ NodePath("../center_left_exit") ]
+
+[node name="center_left_bottom_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, -11 )
+next_road_swithces = [ NodePath("../left_bottom_top"), NodePath("../left_top"), NodePath("../left") ]
+prioritized_road_swithces = [ NodePath("../left_bottom_top") ]
+
+[node name="left_bottom_top" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, 372 )
+next_road_swithces = [ NodePath("../bottom_left_exit"), NodePath("../left_bottom_bottom"), NodePath("../left_bottom_bottom_r") ]
+prioritized_road_swithces = [ NodePath("../bottom_left_exit") ]
+
+[node name="left_bottom_bottom" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -431, 409 )
+next_road_swithces = [ NodePath("../bottom_left_exit2"), NodePath("../corner_bottom"), NodePath("../left_bottom_bottom_r") ]
+prioritized_road_swithces = [ NodePath("../bottom_left_exit2") ]
+
+[node name="left_bottom_bottom_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -404, 409 )
+next_road_swithces = [ NodePath("../center_bottom_bottom_l"), NodePath("../left_bottom_top"), NodePath("../corner_bottom") ]
+prioritized_road_swithces = [ NodePath("../center_bottom_bottom_l") ]
+
+[node name="center_bottom_bottom_l" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -32, 409 )
+next_road_swithces = [ NodePath("../botttom_center_exit"), NodePath("../center_bottom_bottom_r"), NodePath("../bottom_r") ]
+prioritized_road_swithces = [ NodePath("../botttom_center_exit") ]
+
+[node name="center_bottom_bottom_r" parent="roads" instance=ExtResource( 9 )]
+position = Vector2( -5, 409 )
+next_road_swithces = [ NodePath("../bottom_right_l"), NodePath("../bottom"), NodePath("../bottom_r") ]
+prioritized_road_swithces = [ NodePath("../bottom_right_l") ]
+
+[node name="trafic_lights" type="Node2D" parent="."]
+__meta__ = {
+"_edit_group_": true,
+"_edit_lock_": true
+}
+
+[node name="trafic_lights_main" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -18, -30 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/main_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/main_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 7
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -18, -30 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_top_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -19, -438 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/top_center_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/top_center_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 28
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_top_center"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_top_center"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_top_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -19, -438 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_top_center")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_top_center"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_top_center"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_right_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( 520, -30 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/right_center_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/right_center_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 21
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_right_center"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_right_center"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_right_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( 520, -30 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_right_center")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_right_center"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_right_center"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_left_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -417, -30 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/left_center_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/left_center_vert")
+left_zone = NodePath("coll2")
+right_zone = NodePath("coll")
+duration = 14
+
+[node name="coll" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_left_center"]
+position = Vector2( 35, -15 )
+shape = SubResource( 18 )
+
+[node name="coll2" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_left_center"]
+position = Vector2( -38, 19 )
+shape = SubResource( 18 )
+
+[node name="trafic_lights_slave_left_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -417, -30 )
+script = SubResource( 19 )
+is_main = false
+type_way = ""
+trafic_master_node = NodePath("../trafic_lights_main_left_center")
+left_zone = NodePath("coll")
+right_zone = NodePath("coll2")
+
+[node name="coll" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_left_center"]
+position = Vector2( 14, 40 )
+shape = SubResource( 20 )
+
+[node name="coll2" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_left_center"]
+position = Vector2( -14, -35 )
+shape = SubResource( 20 )
+
+[node name="trafic_lights_main_bottom_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -18, 389 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/bottom_center_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/bottom_center_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 7
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_bottom_center"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_bottom_center"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_bottom_center" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -18, 389 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_bottom_center")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_bottom_center"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_bottom_center"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_top_left" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -416, -436 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/top_left_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/top_left_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 28
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_top_left"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_top_left"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_top_left" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -416, -436 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_top_left")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_top_left"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_top_left"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_top_right" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( 522, -436 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/top_right_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/top_right_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 28
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_top_right"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_top_right"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_top_right" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( 522, -436 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_top_right")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_top_right"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_top_right"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_bottom_right" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( 521, 389 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/bottom_right_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/bottom_right_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 28
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_bottom_right"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_bottom_right"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_bottom_right" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( 521, 389 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_bottom_right")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_bottom_right"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_bottom_right"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="trafic_lights_main_bottom_left" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -414, 389 )
+need_deviation = true
+main_zone_car_count = NodePath("../../car_checkin_zones/bottom_left_horiz")
+slave_zone_car_count = NodePath("../../car_checkin_zones/bottom_left_vert")
+left_zone = NodePath("l")
+right_zone = NodePath("r")
+duration = 7
+
+[node name="l" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_bottom_left"]
+position = Vector2( -38, 19 )
+shape = SubResource( 2 )
+
+[node name="r" type="CollisionShape2D" parent="trafic_lights/trafic_lights_main_bottom_left"]
+position = Vector2( 35, -15 )
+shape = SubResource( 3 )
+
+[node name="trafic_lights_slave_bottom_left" parent="trafic_lights" instance=ExtResource( 5 )]
+position = Vector2( -414, 389 )
+is_main = false
+trafic_master_node = NodePath("../trafic_lights_main_bottom_left")
+left_zone = NodePath("up")
+right_zone = NodePath("down")
+
+[node name="up" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_bottom_left"]
+position = Vector2( -14, -35 )
+shape = SubResource( 4 )
+
+[node name="down" type="CollisionShape2D" parent="trafic_lights/trafic_lights_slave_bottom_left"]
+position = Vector2( 13, 40 )
+shape = SubResource( 5 )
+
+[node name="speed_limits" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="speed_limit_zone" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 50, -44 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone2" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -156, -11 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone2"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone2/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone2/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone5" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -348, -45 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone5"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone5/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone5/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone6" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -554, -12 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone6"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone6/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone6/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone7" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 589, -45 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone7"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone7/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone7/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone8" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 383, -12 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone8"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone8/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone8/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone13" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 602, -452 )
+script = SubResource( 23 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone13"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone13/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone13/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone14" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 381, -416 )
+script = SubResource( 24 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone14"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone14/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone14/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone15" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 40, -453 )
+script = SubResource( 23 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone15"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone15/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone15/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone16" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -150, -420 )
+script = SubResource( 24 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone16"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone16/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone16/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone17" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -356, -449 )
+script = SubResource( 23 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone17"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone17/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone17/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone18" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -546, -416 )
+script = SubResource( 24 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone18"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone18/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone18/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone19" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -356, 375 )
+script = SubResource( 25 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone19"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone19/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone19/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone20" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -546, 408 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone20"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone20/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone20/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone21" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 40, 374 )
+script = SubResource( 25 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone21"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone21/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone21/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone22" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -150, 407 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone22"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone22/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone22/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone29" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -867, 411 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone29"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone29/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone29/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone32" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 1033, 368 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone32"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone32/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone32/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone33" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 1007, -417 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone33"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone33/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone33/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone34" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -1126, -417 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone34"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone34/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone34/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone35" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -968, -47 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone35"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone35/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone35/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone36" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 990, -42 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone36"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone36/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone36/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone30" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -884, 377 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 50
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone30"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone30/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone30/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone31" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 984, 407 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 50
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone31"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone31/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone31/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone23" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 582, 375 )
+script = SubResource( 25 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone23"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone23/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone23/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone24" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( 392, 408 )
+script = SubResource( 26 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone24"]
+position = Vector2( 36, 0 )
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone24/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone24/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone3" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -5, 157 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone3"]
+position = Vector2( 0, -61 )
+rotation = -1.57079
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone3/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone3/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone4" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -32, -88 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone4"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone4/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone4/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="speed_limit_zone9" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -5, 568 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone9"]
+position = Vector2( 0, -61 )
+rotation = -1.57079
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone9/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone9/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone10" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -32, 323 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone10"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone10/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone10/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="speed_limit_zone11" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -6, -264 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone11"]
+position = Vector2( 0, -61 )
+rotation = -1.57079
+shape = SubResource( 9 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone11/coll"]
+position = Vector2( -36, 0 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone11/coll"]
+position = Vector2( 39, 0 )
+
+[node name="speed_limit_zone12" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -33, -509 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone12"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone12/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone12/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="speed_limit_zone25" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -32, -858 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 90
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone25"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone25/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone25/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="speed_limit_zone26" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -3, -742 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone26"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone26/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone26/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="speed_limit_zone27" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -3, 1060 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 70
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone27"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone27/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone27/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="speed_limit_zone28" parent="speed_limits" instance=ExtResource( 13 )]
+position = Vector2( -30, 956 )
+__meta__ = {
+"_edit_group_": true
+}
+acceptable_speed = 80
+
+[node name="coll" type="CollisionShape2D" parent="speed_limits/speed_limit_zone28"]
+position = Vector2( -2.67029e-05, -49 )
+rotation = -1.57079
+shape = SubResource( 10 )
+
+[node name="0" type="Position2D" parent="speed_limits/speed_limit_zone28/coll"]
+position = Vector2( -29, 9.15527e-05 )
+
+[node name="1" type="Position2D" parent="speed_limits/speed_limit_zone28/coll"]
+position = Vector2( 25, -2.67029e-05 )
+
+[node name="car_checkin_zones" type="Node2D" parent="."]
+__meta__ = {
+"_edit_group_": true,
+"_edit_lock_": true
+}
+
+[node name="main_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -18, -30 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/main_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/main_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/main_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/main_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="main_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -18, -30 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/main_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/main_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/main_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/main_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="top_center_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -19, -438 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/top_center_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/top_center_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/top_center_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/top_center_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="top_center_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -19, -438 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/top_center_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/top_center_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/top_center_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/top_center_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="left_center_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -416, -30 )
+script = SubResource( 21 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/left_center_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/left_center_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/left_center_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/left_center_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="left_center_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -416, -30 )
+script = SubResource( 22 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/left_center_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/left_center_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/left_center_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/left_center_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="right_center_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( 521, -30 )
+script = SubResource( 21 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/right_center_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/right_center_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/right_center_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/right_center_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="right_center_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( 521, -30 )
+script = SubResource( 22 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/right_center_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/right_center_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/right_center_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/right_center_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="bottom_center_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -18, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/bottom_center_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_center_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/bottom_center_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_center_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="bottom_center_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -18, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/bottom_center_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_center_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/bottom_center_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_center_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="top_left_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -417, -436 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/top_left_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/top_left_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/top_left_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/top_left_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="top_left_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -417, -436 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/top_left_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/top_left_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/top_left_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/top_left_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="top_right_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( 522, -436 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/top_right_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/top_right_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/top_right_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/top_right_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="top_right_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( 522, -436 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/top_right_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/top_right_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/top_right_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/top_right_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="bottom_left_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( 521, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/bottom_left_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_left_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/bottom_left_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_left_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="bottom_left_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( 521, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/bottom_left_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_left_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/bottom_left_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_left_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="bottom_right_horiz" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -416, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/bottom_right_horiz"]
+position = Vector2( -97.5, 19 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_right_horiz/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/bottom_right_horiz"]
+position = Vector2( 95, -15 )
+shape = SubResource( 13 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_right_horiz/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="bottom_right_vert" parent="car_checkin_zones" instance=ExtResource( 12 )]
+position = Vector2( -416, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="car_checkin_zones/bottom_right_vert"]
+position = Vector2( -14, -91 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_right_vert/coll" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="coll2" type="CollisionShape2D" parent="car_checkin_zones/bottom_right_vert"]
+position = Vector2( 13, 96 )
+shape = SubResource( 14 )
+
+[node name="show_zone" parent="car_checkin_zones/bottom_right_vert/coll2" instance=ExtResource( 7 )]
+color = Color( 0, 1, 0.858824, 0.258824 )
+
+[node name="turning_zones" type="Node2D" parent="."]
+visible = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="turning_zone" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( -18, -30 )
+__meta__ = {
+"_edit_group_": true,
+"_edit_lock_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone2" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( -19, 389 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone2"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone3" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( -417, 389 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone3"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone4" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( 521, 389 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone4"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone5" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( 521, -27 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone5"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone6" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( 522, -436 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone6"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone7" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( -18, -438 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone7"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone8" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( -416, -436 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone8"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="turning_zone9" parent="turning_zones" instance=ExtResource( 6 )]
+position = Vector2( -418, -28 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="coll" type="CollisionShape2D" parent="turning_zones/turning_zone9"]
+position = Vector2( -1, 2 )
+shape = SubResource( 1 )
+
+[node name="speed_cameras" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="speed_camera" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -131, -11 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera21" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -31, 898 )
+rotation = 1.57079
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera21"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera24" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -33, -924 )
+rotation = 1.57079
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera24"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera25" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -854, 376 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 50.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera25"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera26" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -840, 410 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera26"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera31" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -936, -46 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera31"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera32" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -1090, -417 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera32"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera27" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 1062, 368 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera27"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera29" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 1024, -42 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera29"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera30" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 1043, -416 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera30"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera28" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 1014, 407 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 50.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera28"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera22" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -3, 1001 )
+rotation = 1.57079
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera22"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera23" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -3, -807 )
+rotation = 1.57079
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera23"]
+position = Vector2( 14, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera2" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 102, -44 )
+rotation = -3.14159
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera2"]
+position = Vector2( 16, -7.24792e-05 )
+shape = SubResource( 11 )
+
+[node name="speed_camera3" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -5, 78 )
+rotation = -4.71238
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera3"]
+position = Vector2( 29.75, 0 )
+shape = SubResource( 12 )
+
+[node name="speed_camera4" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -32, -141 )
+rotation = -4.71238
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera4"]
+position = Vector2( 12.5, 0 )
+shape = SubResource( 11 )
+
+[node name="speed_camera5" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -325, 372 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera5"]
+position = Vector2( 12, 0 )
+shape = SubResource( 27 )
+
+[node name="speed_camera6" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -510, 408 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera6"]
+position = Vector2( 12, 0 )
+shape = SubResource( 27 )
+
+[node name="speed_camera7" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -108, 407 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera7"]
+position = Vector2( 12, 0 )
+shape = SubResource( 27 )
+
+[node name="speed_camera8" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 72, 372 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera8"]
+position = Vector2( 12, 0 )
+shape = SubResource( 27 )
+
+[node name="speed_camera9" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 620, 374 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera9"]
+position = Vector2( 12, 0 )
+shape = SubResource( 27 )
+
+[node name="speed_camera10" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 437, 408 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 70.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera10"]
+position = Vector2( 12, 0 )
+shape = SubResource( 27 )
+
+[node name="speed_camera11" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -322, -453 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera11"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera12" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -506, -416 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera12"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera13" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 84, -454 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera13"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera15" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 638, -452 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera15"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera16" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 423, -417 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera16"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera14" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -108, -420 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 80.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera14"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera17" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -514, -11 )
+script = SubResource( 29 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera17"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera18" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( -312, -46 )
+script = SubResource( 29 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera18"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera19" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 419, -13 )
+script = SubResource( 29 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera19"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="speed_camera20" parent="speed_cameras" instance=ExtResource( 2 )]
+position = Vector2( 625, -44 )
+script = SubResource( 29 )
+__meta__ = {
+"_edit_group_": true
+}
+limit_speed = 60.0
+
+[node name="coll" type="CollisionShape2D" parent="speed_cameras/speed_camera20"]
+position = Vector2( 14, 0 )
+shape = SubResource( 28 )
+
+[node name="spawn_points" type="Node2D" parent="."]
+__meta__ = {
+"_edit_group_": true,
+"_edit_lock_": true
+}
+
+[node name="car_spawn_check" parent="spawn_points" instance=ExtResource( 14 )]
+position = Vector2( -404, 377 )
+
+[node name="car_spawn_check2" parent="spawn_points" instance=ExtResource( 14 )]
+position = Vector2( 507, 372 )
+
+[node name="car_spawn_check3" parent="spawn_points" instance=ExtResource( 14 )]
+position = Vector2( 506, -416 )
+
+[node name="car_spawn_check4" parent="spawn_points" instance=ExtResource( 14 )]
+position = Vector2( -404, -416 )
+
+[node name="prioritize_zones" type="Node2D" parent="."]
+
+[node name="main_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -18, -30 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/main_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/main_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="main_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -18, -30 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/main_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/main_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/main_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/main_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="right_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( 522, -30 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/right_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/right_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="right_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( 522, -30 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/right_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/right_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/right_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/right_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="right_bottom_trafic_light_p" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( 521, 390 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/right_bottom_trafic_light_p"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/right_bottom_trafic_light_p"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="right_bottom_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( 521, 390 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/right_bottom_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/right_bottom_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/right_bottom_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/right_bottom_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="right_top_trafic_light_p" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( 522, -435 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/right_top_trafic_light_p"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/right_top_trafic_light_p"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="right_top_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( 522, -435 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/right_top_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/right_top_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/right_top_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/right_top_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="center_top_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -18, -438 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/center_top_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/center_top_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="center_top_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -18, -438 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/center_top_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/center_top_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/center_top_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/center_top_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="left_top_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -416, -436 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/left_top_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/left_top_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="left_top_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -416, -436 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/left_top_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/left_top_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/left_top_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/left_top_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="left_center_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -417, -30 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/left_center_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/left_center_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="left_center_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -417, -30 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/left_center_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/left_center_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/left_center_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/left_center_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="left_bottom_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -416, 389 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/left_bottom_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/left_bottom_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="left_bottom_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -416, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/left_bottom_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/left_bottom_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/left_bottom_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/left_bottom_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="center_bottom_trafic_light_pr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -18, 389 )
+prioritize = true
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/center_bottom_trafic_light_pr"]
+shape = SubResource( 6 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/center_bottom_trafic_light_pr"]
+position = Vector2( -0.5, 2 )
+shape = SubResource( 7 )
+
+[node name="center_bottom_trafic_light_unpr" parent="prioritize_zones" instance=ExtResource( 3 )]
+position = Vector2( -18, 389 )
+
+[node name="coll" type="CollisionShape2D" parent="prioritize_zones/center_bottom_trafic_light_unpr"]
+position = Vector2( -38, -16 )
+shape = SubResource( 8 )
+
+[node name="coll2" type="CollisionShape2D" parent="prioritize_zones/center_bottom_trafic_light_unpr"]
+position = Vector2( -14, 40 )
+shape = SubResource( 8 )
+
+[node name="coll3" type="CollisionShape2D" parent="prioritize_zones/center_bottom_trafic_light_unpr"]
+position = Vector2( 35, 19 )
+shape = SubResource( 8 )
+
+[node name="coll4" type="CollisionShape2D" parent="prioritize_zones/center_bottom_trafic_light_unpr"]
+position = Vector2( 13, -35 )
+shape = SubResource( 8 )
+
+[node name="special_parking" type="Node2D" parent="."]
+show_behind_parent = true
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="evac_place" parent="special_parking" instance=ExtResource( 4 )]
+position = Vector2( -330, 320 )
+starting_road_switch = NodePath("../../roads/corner_bottom")
+
+[node name="evac_place2" parent="special_parking" instance=ExtResource( 4 )]
+position = Vector2( 458, 333 )
+shape = SubResource( 30 )
+script = SubResource( 31 )
+starting_road_switch = NodePath("../../roads/corner_bottom_r")
+
+[node name="evac_place3" parent="special_parking" instance=ExtResource( 4 )]
+position = Vector2( 474, -378 )
+shape = SubResource( 30 )
+script = SubResource( 31 )
+starting_road_switch = NodePath("../../roads/corner_top_r")
+
+[node name="evac_place4" parent="special_parking" instance=ExtResource( 4 )]
+position = Vector2( -356, -375 )
+shape = SubResource( 30 )
+script = SubResource( 31 )
+starting_road_switch = NodePath("../../roads/corner_top")
+
+[node name="cars" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="parking" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="parking" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( 474, -224 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking"]
+position = Vector2( 33, -1 )
+shape = SubResource( 15 )
+
+[node name="parking6" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( 807, 22 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking6"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking7" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( 864, 439 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking7"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking8" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( 864, -395 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking8"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking9" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( -932, -395 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking9"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking10" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( -793, 22 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking10"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking11" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( -1289, 22 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking11"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking12" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( -932, 439 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking12"]
+position = Vector2( 0, -31 )
+shape = SubResource( 15 )
+
+[node name="parking2" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( 474, 203 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking2"]
+position = Vector2( 33, -1 )
+shape = SubResource( 15 )
+
+[node name="parking5" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( 474, 118 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking5"]
+position = Vector2( 33, -1 )
+shape = SubResource( 15 )
+
+[node name="parking3" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( -364, -159 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking3"]
+position = Vector2( -39, 0 )
+shape = SubResource( 17 )
+
+[node name="parking4" parent="parking" instance=ExtResource( 10 )]
+position = Vector2( -367, 187 )
+
+[node name="coll" type="CollisionShape2D" parent="parking/parking4"]
+position = Vector2( -38, 0 )
+shape = SubResource( 16 )
+
+[node name="repairments" type="Node2D" parent="."]
+position = Vector2( 0, -1 )
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="repair_place" parent="repairments" instance=ExtResource( 11 )]
+position = Vector2( 81, -159 )
+
+[node name="repair_place2" parent="repairments" instance=ExtResource( 11 )]
+position = Vector2( -573, 205 )
+
+[node name="repair_place3" parent="repairments" instance=ExtResource( 11 )]
+position = Vector2( 244, -609 )
+
+[node name="repair_place4" parent="repairments" instance=ExtResource( 11 )]
+position = Vector2( 677, 221 )
+
+[node name="repair_place5" parent="repairments" instance=ExtResource( 11 )]
+position = Vector2( -239, -626 )
+
+[node name="misc" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="camera" type="Node2D" parent="."]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="cam" type="Camera2D" parent="camera"]
+current = true
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="ui" parent="." instance=ExtResource( 8 )]
+visible = false
+
+[node name="timers" type="Node" parent="."]
+
+[node name="change_values" type="Timer" parent="timers"]
+wait_time = 0.5
+autostart = true
+
+[connection signal="timeout" from="timers/change_values" to="." method="_on_change_values_timeout"]

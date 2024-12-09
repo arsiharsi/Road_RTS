@@ -1,0 +1,19 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://scripts/speed_limits/speed_camera.gd" type="Script" id=1]
+[ext_resource path="res://tscnes/points/car_detect_point.tscn" type="PackedScene" id=2]
+[ext_resource path="res://sprites/speed_limits/speed_camera.png" type="Texture" id=3]
+[ext_resource path="res://tscnes/zones/show_zone.tscn" type="PackedScene" id=4]
+
+[node name="speed_camera" type="Area2D"]
+script = ExtResource( 1 )
+detect_point_scene = ExtResource( 2 )
+zone_scene = ExtResource( 4 )
+
+[node name="points" type="Position2D" parent="."]
+
+[node name="spr" type="Sprite" parent="."]
+texture = ExtResource( 3 )
+
+[connection signal="body_entered" from="." to="." method="_on_speed_camera_body_entered"]
+[connection signal="body_exited" from="." to="." method="_on_speed_camera_body_exited"]

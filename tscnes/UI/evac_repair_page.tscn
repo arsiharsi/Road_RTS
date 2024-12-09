@@ -1,0 +1,109 @@
+[gd_scene load_steps=9 format=2]
+
+[ext_resource path="res://sprites/ui/evac_repair_page.png" type="Texture" id=1]
+[ext_resource path="res://fonts/vcrosdmonorusbyd.ttf" type="DynamicFontData" id=2]
+[ext_resource path="res://scripts/ui/evac_repair_page.gd" type="Script" id=3]
+
+[sub_resource type="DynamicFont" id=1]
+size = 9
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=2]
+size = 9
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 119, 15 )
+
+[sub_resource type="RectangleShape2D" id=4]
+
+[sub_resource type="DynamicFont" id=5]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[node name="evac_repair_page" type="Sprite"]
+texture = ExtResource( 1 )
+centered = false
+script = ExtResource( 3 )
+
+[node name="labels" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="name" type="Label" parent="labels"]
+margin_left = 15.0
+margin_top = 5.0
+margin_right = 235.0
+margin_bottom = 32.0
+custom_fonts/font = SubResource( 1 )
+text = "Не выбран"
+align = 1
+valign = 1
+
+[node name="state" type="Label" parent="labels"]
+modulate = Color( 0, 1, 0.156863, 1 )
+margin_left = 159.0
+margin_top = 40.0
+margin_right = 231.0
+margin_bottom = 63.0
+custom_fonts/font = SubResource( 1 )
+text = "Свободен"
+align = 1
+valign = 1
+autowrap = true
+
+[node name="distance_to_point" type="Label" parent="labels"]
+margin_left = 159.0
+margin_top = 74.0
+margin_right = 231.0
+margin_bottom = 97.0
+custom_fonts/font = SubResource( 1 )
+text = "120"
+align = 1
+valign = 1
+
+[node name="state_lbl" type="Label" parent="labels"]
+margin_left = 6.0
+margin_top = 40.0
+margin_right = 159.0
+margin_bottom = 63.0
+custom_fonts/font = SubResource( 1 )
+text = "Состояние: "
+valign = 1
+
+[node name="distance_lbl" type="Label" parent="labels"]
+margin_left = 6.0
+margin_top = 74.0
+margin_right = 159.0
+margin_bottom = 97.0
+custom_fonts/font = SubResource( 2 )
+text = "Дистанция до указ-ля: "
+valign = 1
+
+[node name="buttons" type="Control" parent="."]
+
+[node name="send_car" type="TouchScreenButton" parent="buttons"]
+position = Vector2( 6, 106 )
+shape = SubResource( 3 )
+
+[node name="lbl" type="Label" parent="buttons/send_car"]
+margin_right = 238.0
+margin_bottom = 30.0
+custom_fonts/font = SubResource( 1 )
+text = "Отправить службу на указатель"
+align = 1
+valign = 1
+
+[node name="close" type="TouchScreenButton" parent="buttons"]
+position = Vector2( -20, 0 )
+shape = SubResource( 4 )
+
+[node name="lbl" type="Label" parent="buttons/close"]
+margin_right = 40.0
+margin_bottom = 14.0
+custom_fonts/font = SubResource( 5 )
+text = "x"
+
+[connection signal="pressed" from="buttons/send_car" to="." method="_on_send_car_pressed"]
+[connection signal="pressed" from="buttons/close" to="." method="_on_close_pressed"]

@@ -1,0 +1,85 @@
+[gd_scene load_steps=7 format=2]
+
+[ext_resource path="res://scripts/trafic_lights/trafic_lights.gd" type="Script" id=1]
+[ext_resource path="res://sprites/trafic_lights/base.png" type="Texture" id=2]
+[ext_resource path="res://sprites/trafic_lights/green.png" type="Texture" id=3]
+[ext_resource path="res://sprites/trafic_lights/yellow.png" type="Texture" id=4]
+[ext_resource path="res://sprites/trafic_lights/red.png" type="Texture" id=5]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 8, 16 )
+
+[node name="trafic_lights" type="Area2D"]
+collision_layer = 3
+collision_mask = 3
+script = ExtResource( 1 )
+type_way = "both"
+
+[node name="base_left" type="Sprite" parent="."]
+texture = ExtResource( 2 )
+
+[node name="green" type="Sprite" parent="base_left"]
+texture = ExtResource( 3 )
+
+[node name="red" type="Sprite" parent="base_left"]
+texture = ExtResource( 5 )
+
+[node name="yellow" type="Sprite" parent="base_left"]
+texture = ExtResource( 4 )
+
+[node name="button" type="TouchScreenButton" parent="base_left"]
+position = Vector2( -8, -16 )
+shape = SubResource( 1 )
+
+[node name="base_right" type="Sprite" parent="."]
+texture = ExtResource( 2 )
+
+[node name="green" type="Sprite" parent="base_right"]
+texture = ExtResource( 3 )
+
+[node name="red" type="Sprite" parent="base_right"]
+texture = ExtResource( 5 )
+
+[node name="yellow" type="Sprite" parent="base_right"]
+texture = ExtResource( 4 )
+
+[node name="button" type="TouchScreenButton" parent="base_right"]
+position = Vector2( -8, -16 )
+shape = SubResource( 1 )
+
+[node name="timers" type="Node" parent="."]
+
+[node name="switch_timer" type="Timer" parent="timers"]
+one_shot = true
+
+[node name="fail_timer" type="Timer" parent="timers"]
+wait_time = 0.25
+autostart = true
+
+[node name="no_connection" type="Timer" parent="timers"]
+wait_time = 0.5
+autostart = true
+
+[node name="real_timer" type="Timer" parent="timers"]
+one_shot = true
+
+[node name="cost_timer" type="Timer" parent="timers"]
+autostart = true
+
+[node name="reconnect_timer" type="Timer" parent="timers"]
+one_shot = true
+
+[node name="repair_timer" type="Timer" parent="timers"]
+one_shot = true
+
+[connection signal="body_entered" from="." to="." method="_on_trafic_lights_body_entered"]
+[connection signal="body_exited" from="." to="." method="_on_trafic_lights_body_exited"]
+[connection signal="pressed" from="base_left/button" to="." method="_on_button_pressed"]
+[connection signal="pressed" from="base_right/button" to="." method="_on_button_pressed"]
+[connection signal="timeout" from="timers/switch_timer" to="." method="_on_switch_timer_timeout"]
+[connection signal="timeout" from="timers/fail_timer" to="." method="_on_fail_timer_timeout"]
+[connection signal="timeout" from="timers/no_connection" to="." method="_on_no_connection_timeout"]
+[connection signal="timeout" from="timers/real_timer" to="." method="_on_real_timer_timeout"]
+[connection signal="timeout" from="timers/cost_timer" to="." method="_on_cost_timer_timeout"]
+[connection signal="timeout" from="timers/reconnect_timer" to="." method="_on_reconnect_timer_timeout"]
+[connection signal="timeout" from="timers/repair_timer" to="." method="_on_repair_timer_timeout"]

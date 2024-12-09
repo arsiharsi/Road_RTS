@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://scripts/zones/show_zone.gd" type="Script" id=1]
+
+[node name="show_zone" type="ColorRect"]
+margin_left = -2.0
+margin_top = -2.0
+margin_right = 2.0
+margin_bottom = 2.0
+script = ExtResource( 1 )

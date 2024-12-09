@@ -1,0 +1,247 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "LinePlotter",
+"class": "AreaPlotter",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/plotters/area_plotter.gd"
+}, {
+"base": "Reference",
+"class": "ArrayOperations",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/structures/array_operations.gd"
+}, {
+"base": "Reference",
+"class": "Bar",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/plotting/bar.gd"
+}, {
+"base": "FunctionPlotter",
+"class": "BarPlotter",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/plotters/bar_plotter.gd"
+}, {
+"base": "Control",
+"class": "Canvas",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/canvas/canvas.gd"
+}, {
+"base": "PanelContainer",
+"class": "Chart",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/chart.gd"
+}, {
+"base": "Reference",
+"class": "ChartProperties",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/plotting/chart_properties.gd"
+}, {
+"base": "Resource",
+"class": "DataFrame",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/structures/data_frame.gd"
+}, {
+"base": "PanelContainer",
+"class": "DataTooltip",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/data_tooltip/data_tooltip.gd"
+}, {
+"base": "Reference",
+"class": "ECUtilities",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/scripts/ec_utilities.gd"
+}, {
+"base": "Reference",
+"class": "Function",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/plotting/function.gd"
+}, {
+"base": "HBoxContainer",
+"class": "FunctionLabel",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/legend/function_label.gd"
+}, {
+"base": "VBoxContainer",
+"class": "FunctionLegend",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/legend/function_legend.gd"
+}, {
+"base": "Control",
+"class": "FunctionPlotter",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/plotters/function_plotter.gd"
+}, {
+"base": "Label",
+"class": "FunctionTypeLabel",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/legend/function_type.gd"
+}, {
+"base": "Control",
+"class": "GridBox",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/canvas/plot_box/grid_box.gd"
+}, {
+"base": "ScatterPlotter",
+"class": "LinePlotter",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/plotters/line_plotter.gd"
+}, {
+"base": "Resource",
+"class": "Matrix",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/structures/matrix.gd"
+}, {
+"base": "Reference",
+"class": "MatrixGenerator",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/structures/matrix_generator.gd"
+}, {
+"base": "FunctionPlotter",
+"class": "PiePlotter",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/plotters/pie_plotter.gd"
+}, {
+"base": "Control",
+"class": "PlotBox",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/containers/canvas/plot_box/plot_box.gd"
+}, {
+"base": "Reference",
+"class": "Point",
+"language": "GDScript",
+"path": "res://addons/easy_charts/utilities/classes/plotting/point.gd"
+}, {
+"base": "FunctionPlotter",
+"class": "ScatterPlotter",
+"language": "GDScript",
+"path": "res://addons/easy_charts/control_charts/plotters/scatter_plotter.gd"
+} ]
+_global_script_class_icons={
+"AreaPlotter": "",
+"ArrayOperations": "",
+"Bar": "",
+"BarPlotter": "",
+"Canvas": "",
+"Chart": "res://addons/easy_charts/utilities/icons/linechart.svg",
+"ChartProperties": "",
+"DataFrame": "",
+"DataTooltip": "",
+"ECUtilities": "",
+"Function": "",
+"FunctionLabel": "",
+"FunctionLegend": "",
+"FunctionPlotter": "",
+"FunctionTypeLabel": "",
+"GridBox": "",
+"LinePlotter": "",
+"Matrix": "",
+"MatrixGenerator": "",
+"PiePlotter": "",
+"PlotBox": "",
+"Point": "",
+"ScatterPlotter": ""
+}
+
+[application]
+
+config/name="Светофоры"
+run/main_scene="res://tscnes/main_menu.tscn"
+config/icon="res://sprites/trafic_lights/base.png"
+
+[autoload]
+
+Global="*res://scripts/Global.gd"
+
+[gui]
+
+common/drop_mouse_on_gui_input_disabled=true
+
+[importer_defaults]
+
+texture={
+"compress/bptc_ldr": 0,
+"compress/hdr_mode": 0,
+"compress/lossy_quality": 0.7,
+"compress/mode": 0,
+"compress/normal_map": 0,
+"detect_3d": true,
+"flags/anisotropic": false,
+"flags/filter": false,
+"flags/mipmaps": false,
+"flags/repeat": 0,
+"flags/srgb": 2,
+"process/HDR_as_SRGB": false,
+"process/fix_alpha_border": true,
+"process/invert_color": false,
+"process/normal_map_invert_y": false,
+"process/premult_alpha": false,
+"size_limit": 0,
+"stream": false,
+"svg/scale": 1.0
+}
+
+[input]
+
+ui_left={
+"deadzone": 0.5,
+"events": [ Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":16777231,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":14,"pressure":0.0,"pressed":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":65,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+ ]
+}
+ui_right={
+"deadzone": 0.5,
+"events": [ Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":16777233,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":15,"pressure":0.0,"pressed":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":68,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+ ]
+}
+ui_up={
+"deadzone": 0.5,
+"events": [ Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":16777232,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":12,"pressure":0.0,"pressed":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":87,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+ ]
+}
+ui_down={
+"deadzone": 0.5,
+"events": [ Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":16777234,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":13,"pressure":0.0,"pressed":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":83,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+ ]
+}
+ZOOM_IN={
+"deadzone": 0.5,
+"events": [ Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"button_mask":0,"position":Vector2( 0, 0 ),"global_position":Vector2( 0, 0 ),"factor":1.0,"button_index":5,"pressed":false,"doubleclick":false,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"button_mask":0,"position":Vector2( 0, 0 ),"global_position":Vector2( 0, 0 ),"factor":1.0,"button_index":5,"pressed":false,"doubleclick":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":16777237,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+ ]
+}
+ZOOM_OUT={
+"deadzone": 0.5,
+"events": [ Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"button_mask":0,"position":Vector2( 0, 0 ),"global_position":Vector2( 0, 0 ),"factor":1.0,"button_index":4,"pressed":false,"doubleclick":false,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"button_mask":0,"position":Vector2( 0, 0 ),"global_position":Vector2( 0, 0 ),"factor":1.0,"button_index":4,"pressed":false,"doubleclick":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"alt":false,"shift":false,"control":false,"meta":false,"command":false,"pressed":false,"scancode":16777238,"physical_scancode":0,"unicode":0,"echo":false,"script":null)
+ ]
+}
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+environment/default_clear_color=Color( 0.172549, 0.168627, 0.27451, 1 )
+environment/default_environment="res://default_env.tres"

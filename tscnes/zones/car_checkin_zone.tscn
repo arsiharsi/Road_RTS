@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://scripts/zones/car_checkin_zone.gd" type="Script" id=1]
+[ext_resource path="res://tscnes/points/car_detect_point.tscn" type="PackedScene" id=2]
+
+[node name="car_checkin_zone" type="Area2D"]
+collision_layer = 3
+collision_mask = 3
+script = ExtResource( 1 )
+detect_point_scene = ExtResource( 2 )
+
+[node name="points" type="Position2D" parent="."]
+
+[connection signal="body_entered" from="." to="." method="_on_car_checkin_zone_body_entered"]
+[connection signal="body_exited" from="." to="." method="_on_car_checkin_zone_body_exited"]

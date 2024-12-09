@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://sprites/parking/parking.png" type="Texture" id=1]
+[ext_resource path="res://scripts/parking/parking_lot.gd" type="Script" id=2]
+
+[node name="parking" type="Area2D"]
+collision_layer = 3
+collision_mask = 3
+script = ExtResource( 2 )
+
+[node name="spr" type="Sprite" parent="."]
+texture = ExtResource( 1 )
+
+[connection signal="body_entered" from="." to="." method="_on_parking_body_entered"]
+[connection signal="body_exited" from="." to="." method="_on_parking_body_exited"]

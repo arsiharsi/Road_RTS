@@ -1,0 +1,629 @@
+[gd_scene load_steps=36 format=2]
+
+[ext_resource path="res://sprites/ui/50_pix_measure.png" type="Texture" id=1]
+[ext_resource path="res://fonts/vcrosdmonorusbyd.ttf" type="DynamicFontData" id=2]
+[ext_resource path="res://scripts/ui/ui.gd" type="Script" id=3]
+[ext_resource path="res://tscnes/UI/trafic_light_ui.tscn" type="PackedScene" id=4]
+[ext_resource path="res://sprites/ui/values_page.png" type="Texture" id=5]
+[ext_resource path="res://tscnes/UI/plotter.tscn" type="PackedScene" id=6]
+[ext_resource path="res://tscnes/UI/evac_repair_page.tscn" type="PackedScene" id=7]
+
+[sub_resource type="DynamicFont" id=2]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=9]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=5]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=10]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=6]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=11]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=7]
+
+[sub_resource type="DynamicFont" id=8]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=1]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=14]
+
+[sub_resource type="RectangleShape2D" id=15]
+
+[sub_resource type="RectangleShape2D" id=16]
+
+[sub_resource type="RectangleShape2D" id=17]
+
+[sub_resource type="RectangleShape2D" id=18]
+
+[sub_resource type="RectangleShape2D" id=19]
+
+[sub_resource type="DynamicFont" id=22]
+outline_size = 3
+outline_color = Color( 1, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=26]
+outline_size = 3
+outline_color = Color( 1, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=20]
+size = 11
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=21]
+
+[sub_resource type="DynamicFont" id=13]
+outline_size = 2
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=4]
+font_data = ExtResource( 2 )
+
+[sub_resource type="DynamicFont" id=27]
+outline_size = 3
+outline_color = Color( 0, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=28]
+
+[sub_resource type="RectangleShape2D" id=12]
+
+[sub_resource type="DynamicFont" id=3]
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=23]
+extents = Vector2( 150, 10 )
+
+[sub_resource type="DynamicFont" id=24]
+outline_size = 1
+outline_color = Color( 1, 0, 0, 1 )
+font_data = ExtResource( 2 )
+
+[sub_resource type="RectangleShape2D" id=25]
+extents = Vector2( 150, 10 )
+
+[node name="ui" type="CanvasLayer"]
+pause_mode = 2
+script = ExtResource( 3 )
+__meta__ = {
+"_edit_horizontal_guides_": [ 300.0 ],
+"_edit_vertical_guides_": [ 512.0 ]
+}
+
+[node name="left" type="Control" parent="."]
+anchor_bottom = 1.0
+
+[node name="up" type="Control" parent="left"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="bg" type="Sprite" parent="left/up"]
+texture = ExtResource( 5 )
+centered = false
+
+[node name="time" type="Node2D" parent="left/up"]
+
+[node name="time_lbl" type="Label" parent="left/up/time"]
+margin_right = 113.0
+margin_bottom = 32.0
+custom_fonts/font = SubResource( 2 )
+text = "HH:MM:SS"
+align = 1
+valign = 1
+
+[node name="values" type="Node2D" parent="left/up"]
+
+[node name="avg_speed" type="Label" parent="left/up/values"]
+margin_top = 40.0
+margin_right = 126.0
+margin_bottom = 75.0
+custom_fonts/font = SubResource( 2 )
+text = "средняя скорость:"
+valign = 1
+autowrap = true
+
+[node name="val" type="Label" parent="left/up/values/avg_speed"]
+margin_left = 126.0
+margin_right = 252.0
+margin_bottom = 35.0
+custom_fonts/font = SubResource( 9 )
+text = "0 km/h"
+valign = 1
+autowrap = true
+
+[node name="cars_amount" type="Label" parent="left/up/values"]
+margin_top = 79.0
+margin_right = 127.0
+margin_bottom = 114.0
+custom_fonts/font = SubResource( 5 )
+text = "количество машин:"
+valign = 1
+autowrap = true
+
+[node name="val" type="Label" parent="left/up/values/cars_amount"]
+margin_left = 126.0
+margin_right = 252.0
+margin_bottom = 35.0
+custom_fonts/font = SubResource( 10 )
+text = "0"
+valign = 1
+autowrap = true
+
+[node name="avg_energy_conusmption" type="Label" parent="left/up/values"]
+margin_top = 114.0
+margin_right = 127.0
+margin_bottom = 149.0
+custom_fonts/font = SubResource( 6 )
+text = "трата энергии:"
+valign = 1
+autowrap = true
+
+[node name="val" type="Label" parent="left/up/values/avg_energy_conusmption"]
+margin_left = 126.0
+margin_right = 252.0
+margin_bottom = 35.0
+custom_fonts/font = SubResource( 11 )
+text = "0 kWs"
+valign = 1
+autowrap = true
+
+[node name="hidden_values" type="Node2D" parent="left/up"]
+position = Vector2( -286, 0 )
+
+[node name="energy_cost" type="Label" parent="left/up/hidden_values"]
+margin_top = 40.0
+margin_right = 126.0
+margin_bottom = 75.0
+custom_fonts/font = SubResource( 2 )
+text = "расходы на энернгию:"
+valign = 1
+autowrap = true
+
+[node name="val" type="Label" parent="left/up/hidden_values/energy_cost"]
+margin_left = 126.0
+margin_right = 252.0
+margin_bottom = 35.0
+custom_fonts/font = SubResource( 2 )
+text = "0 rubles"
+valign = 1
+autowrap = true
+
+[node name="fine" type="Label" parent="left/up/hidden_values"]
+margin_top = 79.0
+margin_right = 126.0
+margin_bottom = 114.0
+custom_fonts/font = SubResource( 2 )
+text = "штрафы на:"
+valign = 1
+autowrap = true
+
+[node name="val" type="Label" parent="left/up/hidden_values/fine"]
+margin_left = 126.0
+margin_right = 252.0
+margin_bottom = 35.0
+custom_fonts/font = SubResource( 2 )
+text = "0 rubles"
+valign = 1
+autowrap = true
+
+[node name="repair_cost" type="Label" parent="left/up/hidden_values"]
+margin_top = 114.0
+margin_right = 126.0
+margin_bottom = 149.0
+custom_fonts/font = SubResource( 2 )
+text = "расходы на ремонт:"
+valign = 1
+autowrap = true
+
+[node name="val" type="Label" parent="left/up/hidden_values/repair_cost"]
+margin_left = 126.0
+margin_right = 252.0
+margin_bottom = 35.0
+custom_fonts/font = SubResource( 2 )
+text = "0 rubles"
+valign = 1
+autowrap = true
+
+[node name="value_change_button" type="Node2D" parent="left/up"]
+
+[node name="change_values" type="TouchScreenButton" parent="left/up/value_change_button"]
+position = Vector2( 209, 0 )
+shape = SubResource( 7 )
+
+[node name="val" type="Label" parent="left/up/value_change_button/change_values"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = "<<"
+autowrap = true
+
+[node name="center" type="Control" parent="left"]
+anchor_top = 0.5
+anchor_bottom = 0.5
+
+[node name="pix_measure" type="Node2D" parent="left/center"]
+
+[node name="measure" type="Sprite" parent="left/center/pix_measure"]
+position = Vector2( 40, 0 )
+texture = ExtResource( 1 )
+
+[node name="distance" type="Label" parent="left/center/pix_measure"]
+margin_left = 50.0
+margin_top = -25.0
+margin_right = 102.0
+margin_bottom = 25.0
+custom_fonts/font = SubResource( 1 )
+text = "50 m"
+valign = 1
+
+[node name="controls" type="Node2D" parent="left/center"]
+
+[node name="left" type="TouchScreenButton" parent="left/center/controls"]
+position = Vector2( 126, -9 )
+shape = SubResource( 14 )
+action = "ui_left"
+
+[node name="val" type="Label" parent="left/center/controls/left"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = "<<"
+autowrap = true
+
+[node name="right" type="TouchScreenButton" parent="left/center/controls"]
+position = Vector2( 171, -9 )
+shape = SubResource( 15 )
+action = "ui_right"
+
+[node name="val" type="Label" parent="left/center/controls/right"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = ">>"
+autowrap = true
+
+[node name="up" type="TouchScreenButton" parent="left/center/controls"]
+position = Vector2( 150, -9 )
+rotation = -1.57079
+shape = SubResource( 16 )
+action = "ui_up"
+
+[node name="val" type="Label" parent="left/center/controls/up"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = ">>"
+autowrap = true
+
+[node name="down" type="TouchScreenButton" parent="left/center/controls"]
+position = Vector2( 171, 11 )
+rotation = -4.71238
+shape = SubResource( 17 )
+action = "ui_down"
+
+[node name="val" type="Label" parent="left/center/controls/down"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = ">>"
+autowrap = true
+
+[node name="zoom_in" type="TouchScreenButton" parent="left/center/controls"]
+position = Vector2( 30, -55 )
+shape = SubResource( 18 )
+action = "ZOOM_IN"
+
+[node name="val" type="Label" parent="left/center/controls/zoom_in"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = "+"
+autowrap = true
+
+[node name="zoom_out" type="TouchScreenButton" parent="left/center/controls"]
+position = Vector2( 30, 33 )
+shape = SubResource( 19 )
+action = "ZOOM_OUT"
+
+[node name="val" type="Label" parent="left/center/controls/zoom_out"]
+margin_top = 2.0
+margin_right = 24.0
+margin_bottom = 37.0
+custom_fonts/font = SubResource( 8 )
+text = "-"
+autowrap = true
+
+[node name="bottom" type="Control" parent="left"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+margin_top = -40.0
+margin_right = 40.0
+
+[node name="plotters" type="Node2D" parent="left/bottom"]
+
+[node name="avg_speed" parent="left/bottom/plotters" instance=ExtResource( 6 )]
+position = Vector2( 1, -71 )
+data_string = "км/ч."
+
+[node name="consumption" parent="left/bottom/plotters" instance=ExtResource( 6 )]
+position = Vector2( 102, -71 )
+plotter_name = "потр. энерг."
+color_of_line = Color( 1, 0, 0, 1 )
+data_string = "kW/с."
+
+[node name="car_ammount" parent="left/bottom/plotters" instance=ExtResource( 6 )]
+position = Vector2( 209, -71 )
+plotter_name = "кол-во  авто."
+color_of_line = Color( 0.945098, 1, 0, 1 )
+data_string = "шт."
+
+[node name="center" type="Control" parent="."]
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_bottom = 1.0
+
+[node name="center" type="Control" parent="center"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -20.0
+margin_top = -20.0
+margin_right = 20.0
+margin_bottom = 20.0
+
+[node name="pointer" type="Position2D" parent="center/center"]
+position = Vector2( 20, 20 )
+
+[node name="lbl" type="Label" parent="center/center/pointer"]
+margin_left = -155.0
+margin_top = -8.0
+margin_right = 136.0
+margin_bottom = 38.0
+custom_fonts/font = SubResource( 22 )
+text = "="
+align = 1
+autowrap = true
+
+[node name="lbl2" type="Label" parent="center/center/pointer"]
+margin_left = -135.0
+margin_top = -8.0
+margin_right = 156.0
+margin_bottom = 38.0
+custom_fonts/font = SubResource( 22 )
+text = "="
+align = 1
+autowrap = true
+
+[node name="lbl3" type="Label" parent="center/center/pointer"]
+margin_left = -6.0
+margin_top = -23.0
+margin_right = 7.0
+margin_bottom = -7.0
+rect_rotation = -89.9999
+rect_pivot_offset = Vector2( 6, 8 )
+custom_fonts/font = SubResource( 26 )
+text = "="
+autowrap = true
+
+[node name="lbl4" type="Label" parent="center/center/pointer"]
+margin_left = -6.0
+margin_top = 7.0
+margin_right = 7.0
+margin_bottom = 23.0
+rect_rotation = -89.9999
+rect_pivot_offset = Vector2( 6, 8 )
+custom_fonts/font = SubResource( 26 )
+text = "="
+autowrap = true
+
+[node name="bottom" type="Control" parent="center"]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = -20.0
+margin_right = 20.0
+
+[node name="logging" type="TextEdit" parent="center/bottom"]
+margin_left = -125.0
+margin_top = -173.0
+margin_right = 166.0
+margin_bottom = -11.0
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+custom_colors/font_color_readonly = Color( 1, 1, 1, 1 )
+custom_fonts/font = SubResource( 20 )
+readonly = true
+wrap_enabled = true
+
+[node name="loggin_hide_show_button" type="TouchScreenButton" parent="center/bottom"]
+position = Vector2( 131, -197 )
+shape = SubResource( 21 )
+
+[node name="lbl" type="Label" parent="center/bottom/loggin_hide_show_button"]
+margin_right = 48.0
+margin_bottom = 29.0
+custom_fonts/font = SubResource( 13 )
+text = "x"
+
+[node name="enable_logging" type="CheckBox" parent="center/bottom/loggin_hide_show_button"]
+margin_left = -270.0
+margin_right = 46.0
+margin_bottom = 24.0
+custom_fonts/font = SubResource( 4 )
+pressed = true
+text = "логгирование"
+
+[node name="top" type="Control" parent="center"]
+anchor_right = 1.0
+
+[node name="lbl" type="Label" parent="center/top"]
+margin_left = -145.0
+margin_top = 5.0
+margin_right = 146.0
+margin_bottom = 51.0
+custom_fonts/font = SubResource( 27 )
+text = "Разработано студентом ПИ-429б Хусаиновым А.С."
+align = 1
+autowrap = true
+
+[node name="notifications" type="Node2D" parent="center/top"]
+position = Vector2( 0, 114 )
+
+[node name="to_menu" type="TouchScreenButton" parent="center/top"]
+position = Vector2( -193, 16 )
+scale = Vector2( 2, 2 )
+shape = SubResource( 28 )
+shape_centered = false
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="lbl" type="Label" parent="center/top/to_menu"]
+modulate = Color( 1, 0, 0, 1 )
+margin_left = -25.0
+margin_top = -9.0
+margin_right = 26.0
+margin_bottom = 20.0
+custom_fonts/font = SubResource( 27 )
+text = "x"
+align = 1
+autowrap = true
+
+[node name="right" type="Control" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="top" type="Control" parent="right"]
+anchor_left = 1.0
+anchor_right = 1.0
+margin_left = -40.0
+margin_bottom = 40.0
+
+[node name="trafic_light_ui" parent="right/top" instance=ExtResource( 4 )]
+position = Vector2( -208, 0 )
+
+[node name="close" type="TouchScreenButton" parent="right/top/trafic_light_ui"]
+position = Vector2( -20, 0 )
+shape = SubResource( 12 )
+
+[node name="lbl" type="Label" parent="right/top/trafic_light_ui/close"]
+margin_right = 40.0
+margin_bottom = 14.0
+custom_fonts/font = SubResource( 13 )
+text = "x"
+
+[node name="bottom" type="Control" parent="right"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = -40.0
+margin_top = -40.0
+
+[node name="checks" type="Node2D" parent="right/bottom"]
+
+[node name="visible_cars" type="CheckBox" parent="right/bottom/checks"]
+margin_left = -289.0
+margin_top = -6.0
+margin_right = -69.0
+margin_bottom = 18.0
+custom_fonts/font = SubResource( 3 )
+pressed = true
+text = "показать машины"
+
+[node name="visible_speed_limits" type="CheckBox" parent="right/bottom/checks"]
+margin_left = -289.0
+margin_top = -34.0
+margin_right = 27.0
+margin_bottom = -10.0
+custom_fonts/font = SubResource( 4 )
+pressed = true
+text = "показать ск. ограничения"
+
+[node name="fails" type="Node2D" parent="right/bottom/checks"]
+
+[node name="no_connection" type="TouchScreenButton" parent="right/bottom/checks/fails"]
+position = Vector2( -289, -71 )
+shape = SubResource( 23 )
+
+[node name="lbl" type="Label" parent="right/bottom/checks/fails/no_connection"]
+margin_right = 264.0
+margin_bottom = 16.0
+custom_fonts/font = SubResource( 24 )
+text = "Ошибка: потеря сигнала"
+
+[node name="fail" type="TouchScreenButton" parent="right/bottom/checks/fails"]
+position = Vector2( -289, -104 )
+shape = SubResource( 25 )
+
+[node name="lbl" type="Label" parent="right/bottom/checks/fails/fail"]
+margin_right = 264.0
+margin_bottom = 16.0
+custom_fonts/font = SubResource( 24 )
+text = "Ошибка: критическая ошибка"
+
+[node name="center" type="Control" parent="right"]
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+margin_left = -40.0
+margin_top = -20.0
+margin_bottom = 20.0
+
+[node name="evac_repair_page" parent="right/center" instance=ExtResource( 7 )]
+position = Vector2( -208, -5 )
+
+[node name="timers" type="Node" parent="."]
+
+[node name="plotter_timer" type="Timer" parent="timers"]
+wait_time = 0.25
+autostart = true
+
+[connection signal="pressed" from="left/up/value_change_button/change_values" to="." method="_on_change_values_pressed"]
+[connection signal="pressed" from="center/bottom/loggin_hide_show_button" to="." method="_on_loggin_hide_show_button_pressed"]
+[connection signal="toggled" from="center/bottom/loggin_hide_show_button/enable_logging" to="." method="_on_enable_logging_toggled"]
+[connection signal="pressed" from="center/top/to_menu" to="." method="_on_to_menu_pressed"]
+[connection signal="pressed" from="right/top/trafic_light_ui/close" to="." method="_on_close_pressed"]
+[connection signal="toggled" from="right/bottom/checks/visible_cars" to="." method="_on_visible_cars_toggled"]
+[connection signal="toggled" from="right/bottom/checks/visible_speed_limits" to="." method="_on_visible_speed_limits_toggled"]
+[connection signal="pressed" from="right/bottom/checks/fails/no_connection" to="." method="_on_no_connection_pressed"]
+[connection signal="pressed" from="right/bottom/checks/fails/fail" to="." method="_on_fail_pressed"]
+[connection signal="timeout" from="timers/plotter_timer" to="." method="_on_plotter_timer_timeout"]
